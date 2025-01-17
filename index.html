@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Thunderstorm Power Index Plugin (Demo)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet Draw CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+
+  <style>
+    /* Basic CSS for your plugin container */
+    .plugin-container {
+      background: #fff;
+      padding: 10px;
+      margin: 5px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      font-family: sans-serif;
+      width: 220px;
+    }
+
+    .plugin-header {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .plugin-controls button {
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Windy library (libBoot.js) -->
+  <script src="https://api4.windy.com/assets/libBoot.js"></script>
+
+  <!-- Leaflet JS (required by Windy, but we include it here to be safe) -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet Draw plugin -->
+  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+
+  <!-- Our plugin code -->
+  <script src="plugin.js"></script>
+</body>
+</html>
