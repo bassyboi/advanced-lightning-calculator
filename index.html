@@ -4,13 +4,22 @@
   <meta charset="UTF-8" />
   <title>Thunderstorm Power Index Plugin (Demo)</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <!-- Leaflet Draw CSS -->
+  <!-- (Optional) Leaflet Draw CSS for the drawing UI -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
 
   <style>
-    /* Basic CSS for your plugin container */
+    /* Make sure body and #windy fill the page so you see the map */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    #windy {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Basic styling for your plugin’s control container */
     .plugin-container {
       background: #fff;
       padding: 10px;
@@ -20,12 +29,10 @@
       font-family: sans-serif;
       width: 220px;
     }
-
     .plugin-header {
       font-weight: bold;
       margin-bottom: 8px;
     }
-
     .plugin-controls button {
       margin-right: 5px;
       margin-bottom: 5px;
@@ -33,15 +40,18 @@
   </style>
 </head>
 <body>
-  <!-- Windy library (libBoot.js) -->
+
+  <!-- This div is where Windy will place the map -->
+  <div id="windy"></div>
+
+  <!-- 1) Windy library: must be loaded first so L and windyInit are available -->
   <script src="https://api4.windy.com/assets/libBoot.js"></script>
 
-  <!-- Leaflet JS (required by Windy, but we include it here to be safe) -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <!-- Leaflet Draw plugin -->
+  <!-- 2) Leaflet.Draw plugin, which depends on Leaflet from Windy -->
   <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
 
-  <!-- Our plugin code -->
+  <!-- 3) Your plugin script: must be last, so windyInit and L are already defined -->
   <script src="plugin.js"></script>
+
 </body>
 </html>
