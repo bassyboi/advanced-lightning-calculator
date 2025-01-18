@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Advanced Lightning Potential Calculator</title>
+  <title>Lightning Flash Rate Calculator</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -74,23 +74,17 @@
       font-size: 0.9rem;
       color: #666;
     }
-    pre {
-      background: #fafafa;
-      border: 1px solid #ccc;
-      padding: 10px;
-      overflow: auto;
-      border-radius: 4px;
-      font-size: 0.9rem;
-      margin-top: 15px;
+    hr {
+      margin: 40px 0;
     }
   </style>
 </head>
 <body>
 
-  <h1>Advanced Lightning Potential Calculator</h1>
+  <h1>Lightning Flash Rate Calculator</h1>
   <p class="intro">
-    Estimate lightning threat using basic skew-T inputs (temp &amp; dewpoint at various levels)  
-    or fetch from a weather app/forecast API. Result is a <em>Lightning Factor</em> from 1&ndash;5.
+    Estimate lightning flash frequency using basic skew-T inputs or a mock weather API.  
+    This demo maps a simple <em>instability factor</em> to an approximate <strong>flashes per minute</strong>.
   </p>
 
   <div class="container">
@@ -98,8 +92,8 @@
     <h2>1. Manual Sounding/Weather Data Input</h2>
     <p class="note">
       Enter approximate temperature (&deg;C) and dewpoint (&deg;C) at different levels.  
-      This example calculates a <strong>K-Index</strong> &amp; an approximate <strong>Lifted Index</strong>.  
-      Real meteorology is more complex, but it’s a good start!
+      We'll compute a rough <strong>K-Index</strong>, <strong>Lifted Index</strong>, and  
+      estimate a <strong>Flash Rate</strong> (flashes/min).
     </p>
 
     <!-- Surface Data -->
@@ -112,7 +106,7 @@
       <input id="dewSurface" type="number" step="0.1" value="18" />
     </div>
 
-    <!-- 850-hPa Data (optional, some calculations use it) -->
+    <!-- 850-hPa Data -->
     <div class="input-row">
       <label for="temp850">Temp at 850 hPa (°C):</label>
       <input id="temp850" type="number" step="0.1" value="18" />
@@ -137,11 +131,9 @@
       <label for="temp500">Temp at 500 hPa (°C):</label>
       <input id="temp500" type="number" step="0.1" value="-10" />
     </div>
-    
-    <!-- (Optional) You might add 300-hPa or 250-hPa level for advanced instability checks -->
 
     <!-- Button: Calculate from input -->
-    <button onclick="calculateLightningFromInput()">Calculate Lightning Potential (Manual)</button>
+    <button onclick="calculateLightningFromInput()">Calculate Lightning Flash Rate</button>
 
     <!-- Results Div -->
     <div id="results"></div>
@@ -152,98 +144,96 @@
     <h2>2. Or Fetch from a Weather App/API</h2>
     <p class="note">
       In a real scenario, you might call an external weather service or local model  
-      that returns the needed temperatures, dewpoints, or even full CAPE/shear.  
-      For demonstration, we’ll just simulate an async fetch of some data.
+      that returns needed temperatures & dewpoints (or even full CAPE).  
+      Here, we simulate a fetch with static data.
     </p>
-
     <button onclick="fetchMockForecastData()">Fetch Mock Data &amp; Calculate</button>
 
-    <div class="small-text">
-      <em>Check the console or see the result in the same <strong>results</strong> area above.</em>
-    </div>
   </div>
 
-  <!-- JS CODE BELOW -->
+  <!-- SCRIPT SECTION -->
   <script>
+    /***********************************************************
+     * Basic Meteorological Calculations (Simplified)
+     ***********************************************************/
+
     /**
-     * Calculate K-Index using approximate formula:
+     * K-Index approximate formula:
      *   K = (T850 - T500) + Td850 - (T700 - Td700)
-     *   Where T is temperature (°C), Td is dewpoint (°C)
-     * 
-     * This is a simplified approach. The real K-index is sometimes 
-     * T850 - T500 + TD850 - (T700 - TD700), ignoring certain complexities.
      */
     function computeKIndex(temp850, temp500, dew850, temp700, dew700) {
-      // K-index formula
-      const kIndex = (temp850 - temp500) + dew850 - (temp700 - dew700);
-      return kIndex;
+      return (temp850 - temp500) + dew850 - (temp700 - dew700);
     }
 
     /**
      * Approximate Lifted Index:
      *   LI = T500 - Tparcel500
-     * Where Tparcel500 is the temperature a lifted air parcel
-     * would have at 500 hPa. 
      * 
-     * In a super-simplified approach, let's guess Tparcel500 based 
-     * on surface T/dew. (Real code uses full integration, but we’ll do a rough guess.)
+     * This function uses a very rough estimate for Tparcel500 
+     * (dry adiabatic from surface + minimal moisture correction).
      */
     function computeLiftedIndex(tempSurface, dewSurface, temp500) {
-      // We'll do a naive estimate: 
-      // Tparcel at 500 hPa ~ (surface T) - (9.8 degC/km * approximate 5.5 km from sfc to 500 hPa)
-      // Then add some dewpoint-based correction. This is VERY rough.
-      const approximateLapseRate = 9.8; // degC per km (dry adiabatic)
-      const approximateDepth = 5.5;    // km from surface to 500 hPa (rough average)
-      
-      let tParcel500 = tempSurface - (approximateLapseRate * approximateDepth);
+      const approximateLapseRate = 9.8; // °C per km (dry adiabatic)
+      const approximateDepth = 5.5;     // ~5.5 km from surface to 500hPa
 
-      // If the dewpoint is high, the parcel is more moist, so the lapse rate is slightly lower.
-      // We'll do a small correction: For each 5°C dew above 15, reduce the lapse by ~1 deg. 
-      // (Again, very approximate).
+      let tParcel500 = tempSurface - approximateLapseRate * approximateDepth;
+
+      // Moist correction: for every 5°C above 15 in dewpoint, 
+      // add ~1°C to the parcel (slower cooling).
       if (dewSurface > 15) {
         const above15 = dewSurface - 15;
         const correction = Math.floor(above15 / 5); 
         tParcel500 += correction; 
       }
 
-      // Finally, compute Lifted Index:
-      const LI = temp500 - tParcel500;
-      return LI;
+      return temp500 - tParcel500;
     }
 
     /**
-     * Convert K-Index & Lifted Index to a 1–5 "Lightning Factor"
-     * 
-     * Very approximate mapping. 
+     * Convert K-Index and Lifted Index to an internal "Lightning Factor" (1–5).
      */
-    function lightningFactorFromIndices(kIndex, liftedIndex) {
-      // We'll assign "points" for each index
+    function deriveLightningFactor(kIndex, liftedIndex) {
       let points = 0;
 
-      // K-index thresholds
+      // Score from K-Index
       if (kIndex >= 15) points++;
       if (kIndex >= 20) points++;
       if (kIndex >= 25) points++;
       if (kIndex >= 30) points++;
 
-      // Lifted Index thresholds (negative means more unstable)
-      // e.g., LI < 0 => thunderstorms likely
+      // Score from Lifted Index
       if (liftedIndex < 0) points++;
       if (liftedIndex < -2) points++;
       if (liftedIndex < -4) points++;
 
-      // Constrain final factor to max 5
+      if (points < 1) points = 1;
       if (points > 5) points = 5;
-      if (points < 1) points = 1; // at least 1
-
       return points;
     }
+
+    /**
+     * Map a 1–5 lightning factor to a typical flash range (flashes/min).
+     */
+    function factorToFlashesPerMinute(factor) {
+      switch (factor) {
+        case 1: return "0–5";
+        case 2: return "5–15";
+        case 3: return "15–30";
+        case 4: return "30–45";
+        case 5: return ">45";
+        default: return "N/A";
+      }
+    }
+
+    /***********************************************************
+     * User Interface / Main Logic
+     ***********************************************************/
 
     /**
      * Calculate from Manual Input Fields
      */
     function calculateLightningFromInput() {
-      // Read user inputs
+      // Gather user inputs
       const tempSurface = parseFloat(document.getElementById('tempSurface').value);
       const dewSurface  = parseFloat(document.getElementById('dewSurface').value);
       const temp850     = parseFloat(document.getElementById('temp850').value);
@@ -254,65 +244,60 @@
 
       // 1. Compute K-Index
       const kIndex = computeKIndex(temp850, temp500, dew850, temp700, dew700);
-
       // 2. Compute approximate Lifted Index
       const liftedIndex = computeLiftedIndex(tempSurface, dewSurface, temp500);
-
-      // 3. Map these to a 1–5 lightning factor
-      const lightningFactor = lightningFactorFromIndices(kIndex, liftedIndex);
+      // 3. Derive an internal factor (1-5)
+      const factor = deriveLightningFactor(kIndex, liftedIndex);
+      // 4. Map that factor to "flashes per minute"
+      const flashRate = factorToFlashesPerMinute(factor);
 
       // Show results
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = `
-        <h3>Results</h3>
-        <p><strong>K-Index:</strong> ${kIndex.toFixed(1)}</p>
-        <p><strong>Lifted Index (LI):</strong> ${liftedIndex.toFixed(1)}</p>
-        <p><strong>Estimated Lightning Factor (1-5):</strong> ${lightningFactor}</p>
-        <p class="small-text">
-          <em>Note:</em> This is a <strong>very simplified approach</strong>.  
-          Real CAPE/LIFT computations require integrating a full sounding. 
-        </p>
-      `;
+      displayResults(kIndex, liftedIndex, factor, flashRate, "Manual Data");
     }
 
     /**
-     * Demonstration of fetching from a "weather API" 
-     * In reality, you'd call a real service that returns temperature & dewpoints. 
+     * Demonstration of fetching from a "weather API" (mock).
      */
     async function fetchMockForecastData() {
-      // Example mock data (like from a real weather API)
-      // If you had an actual API endpoint, you'd do:
-      // const response = await fetch("your-api-endpoint");
+      // In a real app, you'd do something like:
+      // const response = await fetch('https://real-weather-service.com/api');
       // const data = await response.json();
-      // Then parse out the needed levels: T850, T700, T500, etc.
+      // For demo, we use a static dataset:
       const mockData = {
-        tempSurface: 27,
-        dewSurface: 20,
-        temp850: 19,
-        dew850: 16,
+        tempSurface: 28,
+        dewSurface: 19,
+        temp850: 20,
+        dew850: 17,
         temp700: 12,
-        dew700: -1,
-        temp500: -11
+        dew700: 0,
+        temp500: -12
       };
-      console.log("Mock data fetched:", mockData);
 
-      // Now do the same steps as above:
+      // Compute indices
       const kIndex = computeKIndex(mockData.temp850, mockData.temp500, mockData.dew850, mockData.temp700, mockData.dew700);
       const liftedIndex = computeLiftedIndex(mockData.tempSurface, mockData.dewSurface, mockData.temp500);
-      const lightningFactor = lightningFactorFromIndices(kIndex, liftedIndex);
+      const factor = deriveLightningFactor(kIndex, liftedIndex);
+      const flashRate = factorToFlashesPerMinute(factor);
 
+      // Display
+      displayResults(kIndex, liftedIndex, factor, flashRate, "API/Mock Data");
+    }
+
+    /**
+     * Helper: Display results in the #results div
+     */
+    function displayResults(kIndex, liftedIndex, factor, flashRate, source) {
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = `
-        <h3>API/Mock Data Results</h3>
-        <p><strong>Data (fetched):</strong> 
-          Surface ${mockData.tempSurface}°C / Dew ${mockData.dewSurface}°C, 
-          850hPa ${mockData.temp850}°C, 
-          700hPa ${mockData.temp700}°C, 
-          500hPa ${mockData.temp500}°C, etc.
-        </p>
+        <h3>${source} Results</h3>
         <p><strong>K-Index:</strong> ${kIndex.toFixed(1)}</p>
         <p><strong>Lifted Index (LI):</strong> ${liftedIndex.toFixed(1)}</p>
-        <p><strong>Estimated Lightning Factor (1-5):</strong> ${lightningFactor}</p>
+        <p><strong>Derived Lightning Factor (1–5):</strong> ${factor}</p>
+        <p><strong>Estimated Flash Rate (flashes/min):</strong> ${flashRate}</p>
+        <p class="small-text">
+          <em>Disclaimer:</em> This mapping is highly simplified. Real storms can deviate significantly.<br/>
+          Always consult official meteorological forecasts for safety-critical decisions.
+        </p>
       `;
     }
   </script>
