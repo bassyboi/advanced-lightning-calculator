@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Enhanced Lightning Flash Rate Calculator</title>
+  <title>Lightning Flash Rate Calculator</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -81,29 +81,20 @@
 </head>
 <body>
 
-  <h1>Enhanced Lightning Flash Rate Calculator</h1>
+  <h1>Lightning Flash Rate Calculator</h1>
   <p class="intro">
-    Incorporates CAPE and Surface RH for more realistic storm assessments.  
-    Outputs an approximate <strong>flashes per minute</strong> range.
+    Estimate lightning flash frequency using basic skew-T inputs or a mock weather API.  
+    This demo maps a simple <em>instability factor</em> to an approximate <strong>flashes per minute</strong>.
   </p>
 
   <div class="container">
     <!-- SECTION 1: Manual Input Fields -->
     <h2>1. Manual Sounding/Weather Data Input</h2>
     <p class="note">
-      Enter approximate temperature (&deg;C), dewpoint (&deg;C), CAPE (J/kg),  
-      and surface RH (%) to get a more detailed estimate of lightning flash rate.
+      Enter approximate temperature (&deg;C) and dewpoint (&deg;C) at different levels.  
+      We'll compute a rough <strong>K-Index</strong>, <strong>Lifted Index</strong>, and  
+      estimate a <strong>Flash Rate</strong> (flashes/min).
     </p>
-
-    <!-- CAPE and RH Inputs (NEW) -->
-    <div class="input-row">
-      <label for="capeValue">CAPE (J/kg):</label>
-      <input id="capeValue" type="number" step="50" value="1000" />
-    </div>
-    <div class="input-row">
-      <label for="rhValue">Surface RH (%):</label>
-      <input id="rhValue" type="number" step="1" value="50" />
-    </div>
 
     <!-- Surface Data -->
     <div class="input-row">
@@ -153,7 +144,7 @@
     <h2>2. Or Fetch from a Weather App/API</h2>
     <p class="note">
       In a real scenario, you might call an external weather service or local model  
-      that returns CAPE, humidity, temperatures & dewpoints.  
+      that returns needed temperatures & dewpoints (or even full CAPE).  
       Here, we simulate a fetch with static data.
     </p>
     <button onclick="fetchMockForecastData()">Fetch Mock Data &amp; Calculate</button>
@@ -163,183 +154,116 @@
   <!-- SCRIPT SECTION -->
   <script>
     /***********************************************************
-     * Basic Meteorological Calculations (Expanded)
+     * Basic Meteorological Calculations (Simplified)
      ***********************************************************/
 
     /**
-     * 1) K-Index approximate:
-     *    K = (T850 - T500) + Td850 - (T700 - Td700)
+     * K-Index approximate formula:
+     *   K = (T850 - T500) + Td850 - (T700 - Td700)
      */
     function computeKIndex(temp850, temp500, dew850, temp700, dew700) {
       return (temp850 - temp500) + dew850 - (temp700 - dew700);
     }
 
     /**
-     * 2) Approximate Lifted Index:
-     *    LI = T500 - Tparcel500
+     * Approximate Lifted Index:
+     *   LI = T500 - Tparcel500
      * 
-     * Extremely simplified. Real calculations use a full parcel-lift integration.
+     * This function uses a very rough estimate for Tparcel500 
+     * (dry adiabatic from surface + minimal moisture correction).
      */
     function computeLiftedIndex(tempSurface, dewSurface, temp500) {
-      const approximateLapseRate = 9.8; // °C/km (dry adiabatic)
+      const approximateLapseRate = 9.8; // °C per km (dry adiabatic)
       const approximateDepth = 5.5;     // ~5.5 km from surface to 500hPa
 
       let tParcel500 = tempSurface - approximateLapseRate * approximateDepth;
 
-      // Moist correction: for every 5°C above 15 in dewpoint, add ~1°C.
+      // Moist correction: for every 5°C above 15 in dewpoint, 
+      // add ~1°C to the parcel (slower cooling).
       if (dewSurface > 15) {
         const above15 = dewSurface - 15;
         const correction = Math.floor(above15 / 5); 
-        tParcel500 += correction;
+        tParcel500 += correction; 
       }
 
       return temp500 - tParcel500;
     }
 
     /**
-     * 3) CAPE-based factor:
-     *    We transform raw CAPE (J/kg) into a 0–4 scale (example).
-     *    You can adjust thresholds to suit your region.
+     * Convert K-Index and Lifted Index to an internal "Lightning Factor" (1–5).
      */
-    function computeCAPEFactor(capeValue) {
-      let points = 0;
-      if (capeValue > 500)  points++;
-      if (capeValue > 1000) points++;
-      if (capeValue > 2000) points++;
-      if (capeValue > 3000) points++;
-      return points;
-    }
-
-    /**
-     * 4) Surface RH-based factor:
-     *    Another 0–4 scale (example).
-     */
-    function computeRHFactor(rhValue) {
-      let points = 0;
-      if (rhValue >= 40) points++;
-      if (rhValue >= 60) points++;
-      if (rhValue >= 70) points++;
-      if (rhValue >= 80) points++;
-      return points;
-    }
-
-    /**
-     * Summation of all factors => yields 1–10 points 
-     * (We clamp the min to 1 and max to 10, for a bigger range).
-     * 
-     * K-Index thresholds => up to 4 points
-     * Lifted Index thresholds => up to 3 points
-     * CAPE factor => up to 4 points
-     * RH factor => up to 4 points
-     * 
-     * But to avoid overshooting, we can scale/clamp the final total to 1–10.
-     */
-    function deriveStormPoints(kIndex, liftedIndex, capePoints, rhPoints) {
+    function deriveLightningFactor(kIndex, liftedIndex) {
       let points = 0;
 
-      // K-index scoring (up to 4)
+      // Score from K-Index
       if (kIndex >= 15) points++;
       if (kIndex >= 20) points++;
       if (kIndex >= 25) points++;
       if (kIndex >= 30) points++;
 
-      // Lifted Index scoring (up to 3)
+      // Score from Lifted Index
       if (liftedIndex < 0) points++;
       if (liftedIndex < -2) points++;
       if (liftedIndex < -4) points++;
 
-      // Add in CAPE factor (0–4)
-      points += capePoints;
-
-      // Add in RH factor (0–4)
-      points += rhPoints;
-
-      // Now clamp between 1 and 10
-      if (points < 1)  points = 1;
-      if (points > 10) points = 10;
-
+      if (points < 1) points = 1;
+      if (points > 5) points = 5;
       return points;
     }
 
     /**
-     * Map a 1–10 factor to a typical flash range (flashes/min).
-     * Example: 
-     *   1 => 0–2
-     *   2 => 2–5
-     *   3 => 5–10
-     *   4 => 10–15
-     *   5 => 15–20
-     *   6 => 20–30
-     *   7 => 30–45
-     *   8 => 45–60
-     *   9 => 60–80
-     *   10 => >80
-     * Adjust to match your experience/region.
+     * Map a 1–5 lightning factor to a typical flash range (flashes/min).
      */
     function factorToFlashesPerMinute(factor) {
       switch (factor) {
-        case 1:  return "0–2";
-        case 2:  return "2–5";
-        case 3:  return "5–10";
-        case 4:  return "10–15";
-        case 5:  return "15–20";
-        case 6:  return "20–30";
-        case 7:  return "30–45";
-        case 8:  return "45–60";
-        case 9:  return "60–80";
-        case 10: return ">80";
+        case 1: return "0–5";
+        case 2: return "5–15";
+        case 3: return "15–30";
+        case 4: return "30–45";
+        case 5: return ">45";
         default: return "N/A";
       }
     }
 
     /***********************************************************
-     * Main Logic: Manual Input / Mock API
+     * User Interface / Main Logic
      ***********************************************************/
 
+    /**
+     * Calculate from Manual Input Fields
+     */
     function calculateLightningFromInput() {
       // Gather user inputs
-      const capeValue   = parseFloat(document.getElementById('capeValue').value);
-      const rhValue     = parseFloat(document.getElementById('rhValue').value);
-
       const tempSurface = parseFloat(document.getElementById('tempSurface').value);
       const dewSurface  = parseFloat(document.getElementById('dewSurface').value);
-
       const temp850     = parseFloat(document.getElementById('temp850').value);
       const dew850      = parseFloat(document.getElementById('dew850').value);
       const temp700     = parseFloat(document.getElementById('temp700').value);
       const dew700      = parseFloat(document.getElementById('dew700').value);
       const temp500     = parseFloat(document.getElementById('temp500').value);
 
-      // 1) K-Index
+      // 1. Compute K-Index
       const kIndex = computeKIndex(temp850, temp500, dew850, temp700, dew700);
-
-      // 2) Lifted Index
+      // 2. Compute approximate Lifted Index
       const liftedIndex = computeLiftedIndex(tempSurface, dewSurface, temp500);
+      // 3. Derive an internal factor (1-5)
+      const factor = deriveLightningFactor(kIndex, liftedIndex);
+      // 4. Map that factor to "flashes per minute"
+      const flashRate = factorToFlashesPerMinute(factor);
 
-      // 3) CAPE factor
-      const capePoints = computeCAPEFactor(capeValue);
-
-      // 4) RH factor
-      const rhPoints   = computeRHFactor(rhValue);
-
-      // 5) Sum everything => storm factor (1–10)
-      const stormFactor = deriveStormPoints(kIndex, liftedIndex, capePoints, rhPoints);
-
-      // 6) Convert to flash rate
-      const flashRate = factorToFlashesPerMinute(stormFactor);
-
-      displayResults(kIndex, liftedIndex, capeValue, rhValue, stormFactor, flashRate, "Manual Data");
+      // Show results
+      displayResults(kIndex, liftedIndex, factor, flashRate, "Manual Data");
     }
 
     /**
-     * Mock Weather API fetch
+     * Demonstration of fetching from a "weather API" (mock).
      */
     async function fetchMockForecastData() {
-      // Real usage: fetch actual JSON from your weather service
-      // Here, we simulate a CAPE, RH, and typical temp/dew data:
+      // In a real app, you'd do something like:
+      // const response = await fetch('https://real-weather-service.com/api');
+      // const data = await response.json();
+      // For demo, we use a static dataset:
       const mockData = {
-        cape: 2200,
-        rh: 65,
         tempSurface: 28,
         dewSurface: 19,
         temp850: 20,
@@ -349,42 +273,30 @@
         temp500: -12
       };
 
-      // 1) K-Index
+      // Compute indices
       const kIndex = computeKIndex(mockData.temp850, mockData.temp500, mockData.dew850, mockData.temp700, mockData.dew700);
-
-      // 2) Lifted Index
       const liftedIndex = computeLiftedIndex(mockData.tempSurface, mockData.dewSurface, mockData.temp500);
+      const factor = deriveLightningFactor(kIndex, liftedIndex);
+      const flashRate = factorToFlashesPerMinute(factor);
 
-      // 3) CAPE factor
-      const capePoints = computeCAPEFactor(mockData.cape);
-
-      // 4) RH factor
-      const rhPoints   = computeRHFactor(mockData.rh);
-
-      // 5) Sum => final factor
-      const stormFactor = deriveStormPoints(kIndex, liftedIndex, capePoints, rhPoints);
-
-      // 6) Convert to flash rate
-      const flashRate = factorToFlashesPerMinute(stormFactor);
-
-      // Show results
-      displayResults(kIndex, liftedIndex, mockData.cape, mockData.rh, stormFactor, flashRate, "API/Mock Data");
+      // Display
+      displayResults(kIndex, liftedIndex, factor, flashRate, "API/Mock Data");
     }
 
-    function displayResults(kIndex, liftedIndex, capeVal, rhVal, stormFactor, flashRate, source) {
+    /**
+     * Helper: Display results in the #results div
+     */
+    function displayResults(kIndex, liftedIndex, factor, flashRate, source) {
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = `
         <h3>${source} Results</h3>
         <p><strong>K-Index:</strong> ${kIndex.toFixed(1)}</p>
         <p><strong>Lifted Index (LI):</strong> ${liftedIndex.toFixed(1)}</p>
-        <p><strong>CAPE (J/kg):</strong> ${capeVal}</p>
-        <p><strong>Surface RH (%):</strong> ${rhVal}</p>
-        <p><strong>Storm Factor (1–10):</strong> ${stormFactor}</p>
+        <p><strong>Derived Lightning Factor (1–5):</strong> ${factor}</p>
         <p><strong>Estimated Flash Rate (flashes/min):</strong> ${flashRate}</p>
         <p class="small-text">
-          <em>Disclaimer:</em> This is a <strong>highly simplified approach</strong>. 
-          Actual lightning rates depend on many factors (shear, microphysics, etc.).<br/>
-          Always consult official forecasts for safety-critical decisions.
+          <em>Disclaimer:</em> This mapping is highly simplified. Real storms can deviate significantly.<br/>
+          Always consult official meteorological forecasts for safety-critical decisions.
         </p>
       `;
     }
