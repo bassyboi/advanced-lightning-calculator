@@ -2,56 +2,319 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Thunderstorm Power Index Plugin (Demo)</title>
-
-  <!-- (Optional) Leaflet Draw CSS for the drawing UI -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
-
+  <title>Advanced Lightning Potential Calculator</title>
   <style>
-    /* Make sure body and #windy fill the page so you see the map */
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
     }
-    #windy {
-      width: 100%;
-      height: 100%;
+    h1, h2 {
+      text-align: center;
     }
-
-    /* Basic styling for your plugin’s control container */
-    .plugin-container {
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
       background: #fff;
-      padding: 10px;
-      margin: 5px;
-      border-radius: 4px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      font-family: sans-serif;
-      width: 220px;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
     }
-    .plugin-header {
+    .intro {
+      font-style: italic;
+      color: #555;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .input-row {
+      display: flex;
+      align-items: baseline;
+      margin: 10px 0;
+    }
+    .input-row label {
+      flex: 1;
       font-weight: bold;
-      margin-bottom: 8px;
+      margin-right: 10px;
     }
-    .plugin-controls button {
+    .input-row input {
+      width: 120px;
+      padding: 4px;
       margin-right: 5px;
-      margin-bottom: 5px;
+    }
+    .note {
+      font-size: 0.9rem;
+      color: #777;
+      margin-bottom: 1em;
+    }
+    button {
+      display: block;
+      margin: 20px auto;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #results {
+      margin-top: 20px;
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #bbdefb;
+    }
+    #results h3 {
+      margin-top: 0;
+    }
+    .small-text {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    pre {
+      background: #fafafa;
+      border: 1px solid #ccc;
+      padding: 10px;
+      overflow: auto;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      margin-top: 15px;
     }
   </style>
 </head>
 <body>
 
-  <!-- This div is where Windy will place the map -->
-  <div id="windy"></div>
+  <h1>Advanced Lightning Potential Calculator</h1>
+  <p class="intro">
+    Estimate lightning threat using basic skew-T inputs (temp &amp; dewpoint at various levels)  
+    or fetch from a weather app/forecast API. Result is a <em>Lightning Factor</em> from 1&ndash;5.
+  </p>
 
-  <!-- 1) Windy library: must be loaded first so L and windyInit are available -->
-  <script src="https://api4.windy.com/assets/libBoot.js"></script>
+  <div class="container">
+    <!-- SECTION 1: Manual Input Fields -->
+    <h2>1. Manual Sounding/Weather Data Input</h2>
+    <p class="note">
+      Enter approximate temperature (&deg;C) and dewpoint (&deg;C) at different levels.  
+      This example calculates a <strong>K-Index</strong> &amp; an approximate <strong>Lifted Index</strong>.  
+      Real meteorology is more complex, but it’s a good start!
+    </p>
 
-  <!-- 2) Leaflet.Draw plugin, which depends on Leaflet from Windy -->
-  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+    <!-- Surface Data -->
+    <div class="input-row">
+      <label for="tempSurface">Surface Temp (°C):</label>
+      <input id="tempSurface" type="number" step="0.1" value="25" />
+    </div>
+    <div class="input-row">
+      <label for="dewSurface">Surface Dewpoint (°C):</label>
+      <input id="dewSurface" type="number" step="0.1" value="18" />
+    </div>
 
-  <!-- 3) Your plugin script: must be last, so windyInit and L are already defined -->
-  <script src="plugin.js"></script>
+    <!-- 850-hPa Data (optional, some calculations use it) -->
+    <div class="input-row">
+      <label for="temp850">Temp at 850 hPa (°C):</label>
+      <input id="temp850" type="number" step="0.1" value="18" />
+    </div>
+    <div class="input-row">
+      <label for="dew850">Dewpoint at 850 hPa (°C):</label>
+      <input id="dew850" type="number" step="0.1" value="15" />
+    </div>
 
+    <!-- 700-hPa Data -->
+    <div class="input-row">
+      <label for="temp700">Temp at 700 hPa (°C):</label>
+      <input id="temp700" type="number" step="0.1" value="10" />
+    </div>
+    <div class="input-row">
+      <label for="dew700">Dewpoint at 700 hPa (°C):</label>
+      <input id="dew700" type="number" step="0.1" value="-2" />
+    </div>
+
+    <!-- 500-hPa Data -->
+    <div class="input-row">
+      <label for="temp500">Temp at 500 hPa (°C):</label>
+      <input id="temp500" type="number" step="0.1" value="-10" />
+    </div>
+    
+    <!-- (Optional) You might add 300-hPa or 250-hPa level for advanced instability checks -->
+
+    <!-- Button: Calculate from input -->
+    <button onclick="calculateLightningFromInput()">Calculate Lightning Potential (Manual)</button>
+
+    <!-- Results Div -->
+    <div id="results"></div>
+
+    <hr />
+
+    <!-- SECTION 2: Fetch from Weather API (Placeholder) -->
+    <h2>2. Or Fetch from a Weather App/API</h2>
+    <p class="note">
+      In a real scenario, you might call an external weather service or local model  
+      that returns the needed temperatures, dewpoints, or even full CAPE/shear.  
+      For demonstration, we’ll just simulate an async fetch of some data.
+    </p>
+
+    <button onclick="fetchMockForecastData()">Fetch Mock Data &amp; Calculate</button>
+
+    <div class="small-text">
+      <em>Check the console or see the result in the same <strong>results</strong> area above.</em>
+    </div>
+  </div>
+
+  <!-- JS CODE BELOW -->
+  <script>
+    /**
+     * Calculate K-Index using approximate formula:
+     *   K = (T850 - T500) + Td850 - (T700 - Td700)
+     *   Where T is temperature (°C), Td is dewpoint (°C)
+     * 
+     * This is a simplified approach. The real K-index is sometimes 
+     * T850 - T500 + TD850 - (T700 - TD700), ignoring certain complexities.
+     */
+    function computeKIndex(temp850, temp500, dew850, temp700, dew700) {
+      // K-index formula
+      const kIndex = (temp850 - temp500) + dew850 - (temp700 - dew700);
+      return kIndex;
+    }
+
+    /**
+     * Approximate Lifted Index:
+     *   LI = T500 - Tparcel500
+     * Where Tparcel500 is the temperature a lifted air parcel
+     * would have at 500 hPa. 
+     * 
+     * In a super-simplified approach, let's guess Tparcel500 based 
+     * on surface T/dew. (Real code uses full integration, but we’ll do a rough guess.)
+     */
+    function computeLiftedIndex(tempSurface, dewSurface, temp500) {
+      // We'll do a naive estimate: 
+      // Tparcel at 500 hPa ~ (surface T) - (9.8 degC/km * approximate 5.5 km from sfc to 500 hPa)
+      // Then add some dewpoint-based correction. This is VERY rough.
+      const approximateLapseRate = 9.8; // degC per km (dry adiabatic)
+      const approximateDepth = 5.5;    // km from surface to 500 hPa (rough average)
+      
+      let tParcel500 = tempSurface - (approximateLapseRate * approximateDepth);
+
+      // If the dewpoint is high, the parcel is more moist, so the lapse rate is slightly lower.
+      // We'll do a small correction: For each 5°C dew above 15, reduce the lapse by ~1 deg. 
+      // (Again, very approximate).
+      if (dewSurface > 15) {
+        const above15 = dewSurface - 15;
+        const correction = Math.floor(above15 / 5); 
+        tParcel500 += correction; 
+      }
+
+      // Finally, compute Lifted Index:
+      const LI = temp500 - tParcel500;
+      return LI;
+    }
+
+    /**
+     * Convert K-Index & Lifted Index to a 1–5 "Lightning Factor"
+     * 
+     * Very approximate mapping. 
+     */
+    function lightningFactorFromIndices(kIndex, liftedIndex) {
+      // We'll assign "points" for each index
+      let points = 0;
+
+      // K-index thresholds
+      if (kIndex >= 15) points++;
+      if (kIndex >= 20) points++;
+      if (kIndex >= 25) points++;
+      if (kIndex >= 30) points++;
+
+      // Lifted Index thresholds (negative means more unstable)
+      // e.g., LI < 0 => thunderstorms likely
+      if (liftedIndex < 0) points++;
+      if (liftedIndex < -2) points++;
+      if (liftedIndex < -4) points++;
+
+      // Constrain final factor to max 5
+      if (points > 5) points = 5;
+      if (points < 1) points = 1; // at least 1
+
+      return points;
+    }
+
+    /**
+     * Calculate from Manual Input Fields
+     */
+    function calculateLightningFromInput() {
+      // Read user inputs
+      const tempSurface = parseFloat(document.getElementById('tempSurface').value);
+      const dewSurface  = parseFloat(document.getElementById('dewSurface').value);
+      const temp850     = parseFloat(document.getElementById('temp850').value);
+      const dew850      = parseFloat(document.getElementById('dew850').value);
+      const temp700     = parseFloat(document.getElementById('temp700').value);
+      const dew700      = parseFloat(document.getElementById('dew700').value);
+      const temp500     = parseFloat(document.getElementById('temp500').value);
+
+      // 1. Compute K-Index
+      const kIndex = computeKIndex(temp850, temp500, dew850, temp700, dew700);
+
+      // 2. Compute approximate Lifted Index
+      const liftedIndex = computeLiftedIndex(tempSurface, dewSurface, temp500);
+
+      // 3. Map these to a 1–5 lightning factor
+      const lightningFactor = lightningFactorFromIndices(kIndex, liftedIndex);
+
+      // Show results
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = `
+        <h3>Results</h3>
+        <p><strong>K-Index:</strong> ${kIndex.toFixed(1)}</p>
+        <p><strong>Lifted Index (LI):</strong> ${liftedIndex.toFixed(1)}</p>
+        <p><strong>Estimated Lightning Factor (1-5):</strong> ${lightningFactor}</p>
+        <p class="small-text">
+          <em>Note:</em> This is a <strong>very simplified approach</strong>.  
+          Real CAPE/LIFT computations require integrating a full sounding. 
+        </p>
+      `;
+    }
+
+    /**
+     * Demonstration of fetching from a "weather API" 
+     * In reality, you'd call a real service that returns temperature & dewpoints. 
+     */
+    async function fetchMockForecastData() {
+      // Example mock data (like from a real weather API)
+      // If you had an actual API endpoint, you'd do:
+      // const response = await fetch("your-api-endpoint");
+      // const data = await response.json();
+      // Then parse out the needed levels: T850, T700, T500, etc.
+      const mockData = {
+        tempSurface: 27,
+        dewSurface: 20,
+        temp850: 19,
+        dew850: 16,
+        temp700: 12,
+        dew700: -1,
+        temp500: -11
+      };
+      console.log("Mock data fetched:", mockData);
+
+      // Now do the same steps as above:
+      const kIndex = computeKIndex(mockData.temp850, mockData.temp500, mockData.dew850, mockData.temp700, mockData.dew700);
+      const liftedIndex = computeLiftedIndex(mockData.tempSurface, mockData.dewSurface, mockData.temp500);
+      const lightningFactor = lightningFactorFromIndices(kIndex, liftedIndex);
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = `
+        <h3>API/Mock Data Results</h3>
+        <p><strong>Data (fetched):</strong> 
+          Surface ${mockData.tempSurface}°C / Dew ${mockData.dewSurface}°C, 
+          850hPa ${mockData.temp850}°C, 
+          700hPa ${mockData.temp700}°C, 
+          500hPa ${mockData.temp500}°C, etc.
+        </p>
+        <p><strong>K-Index:</strong> ${kIndex.toFixed(1)}</p>
+        <p><strong>Lifted Index (LI):</strong> ${liftedIndex.toFixed(1)}</p>
+        <p><strong>Estimated Lightning Factor (1-5):</strong> ${lightningFactor}</p>
+      `;
+    }
+  </script>
 </body>
 </html>
